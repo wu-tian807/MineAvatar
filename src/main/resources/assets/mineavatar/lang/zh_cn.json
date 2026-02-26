@@ -10,5 +10,7 @@
   "mineavatar.configuration.agent.maxPerPlayer": "每个玩家最大 Agent 数",
 
   "mineavatar.message.agent_spawned": "Agent '%s' 已生成！",
-  "mineavatar.message.agent_dismissed": "已遣散 %d 个 Agent。"
+  "mineavatar.message.agent_dismissed": "已遣散 %d 个 Agent。",
+  "mineavatar.message.model_set": "Agent '%s' 的模型已设置为 '%s'。",
+  "mineavatar.message.model_cleared": "Agent '%s' 的模型已清除（恢复为 Steve）。"
 }

@@ -27,36 +27,64 @@ public class MineAvatarCommands {
                                     return spawnAgent(ctx.getSource(), player, name);
                                 })))
                 .then(Commands.literal("dismiss")
+                        .then(Commands.argument("name", StringArgumentType.string())
+                                .executes(ctx -> {
+                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    String name = StringArgumentType.getString(ctx, "name");
+                                    return dismissAgent(ctx.getSource(), player, name);
+                                }))
                         .executes(ctx -> {
                             ServerPlayer player = ctx.getSource().getPlayerOrException();
-                            return dismissAgents(ctx.getSource(), player);
+                            return dismissAllAgents(ctx.getSource(), player);
                         }))
                 .then(Commands.literal("moveto")
-                        .then(Commands.argument("pos", Vec3Argument.vec3())
-                                .executes(ctx -> {
-                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
-                                    Vec3 pos = Vec3Argument.getVec3(ctx, "pos");
-                                    return moveToCommand(ctx.getSource(), player, pos);
-                                })))
+                        .then(Commands.argument("name", StringArgumentType.string())
+                                .then(Commands.argument("pos", Vec3Argument.vec3())
+                                        .executes(ctx -> {
+                                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                            String name = StringArgumentType.getString(ctx, "name");
+                                            Vec3 pos = Vec3Argument.getVec3(ctx, "pos");
+                                            return moveToCommand(ctx.getSource(), player, name, pos);
+                                        }))))
                 .then(Commands.literal("lookat")
-                        .then(Commands.literal("clear")
-                                .executes(ctx -> {
-                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
-                                    return lookAtClear(ctx.getSource(), player);
-                                }))
-                        .then(Commands.argument("target", EntityArgument.entity())
-                                .executes(ctx -> {
-                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
-                                    Entity target = EntityArgument.getEntity(ctx, "target");
-                                    return lookAtCommand(ctx.getSource(), player, target);
-                                })))
+                        .then(Commands.argument("name", StringArgumentType.string())
+                                .then(Commands.literal("clear")
+                                        .executes(ctx -> {
+                                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                            String name = StringArgumentType.getString(ctx, "name");
+                                            return lookAtClear(ctx.getSource(), player, name);
+                                        }))
+                                .then(Commands.argument("target", EntityArgument.entity())
+                                        .executes(ctx -> {
+                                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                            String name = StringArgumentType.getString(ctx, "name");
+                                            Entity target = EntityArgument.getEntity(ctx, "target");
+                                            return lookAtCommand(ctx.getSource(), player, name, target);
+                                        }))))
                 .then(Commands.literal("attack")
-                        .then(Commands.argument("target", EntityArgument.entity())
-                                .executes(ctx -> {
-                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
-                                    Entity target = EntityArgument.getEntity(ctx, "target");
-                                    return attackCommand(ctx.getSource(), player, target);
-                                })))
+                        .then(Commands.argument("name", StringArgumentType.string())
+                                .then(Commands.argument("target", EntityArgument.entity())
+                                        .executes(ctx -> {
+                                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                            String name = StringArgumentType.getString(ctx, "name");
+                                            Entity target = EntityArgument.getEntity(ctx, "target");
+                                            return attackCommand(ctx.getSource(), player, name, target);
+                                        }))))
+                .then(Commands.literal("model")
+                        .then(Commands.argument("name", StringArgumentType.string())
+                                .then(Commands.literal("clear")
+                                        .executes(ctx -> {
+                                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                            String name = StringArgumentType.getString(ctx, "name");
+                                            return modelClear(ctx.getSource(), player, name);
+                                        }))
+                                .then(Commands.argument("modelFolder", StringArgumentType.string())
+                                        .executes(ctx -> {
+                                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                            String name = StringArgumentType.getString(ctx, "name");
+                                            String modelFolder = StringArgumentType.getString(ctx, "modelFolder");
+                                            return modelSet(ctx.getSource(), player, name, modelFolder);
+                                        }))))
         );
     }
 
@@ -77,7 +105,19 @@ public class MineAvatarCommands {
         return 1;
     }
 
-    private static int dismissAgents(CommandSourceStack source, ServerPlayer player) {
+    private static int dismissAgent(CommandSourceStack source, ServerPlayer player, String name) {
+        AgentEntity agent = findOwnedAgent(player, name);
+        if (agent == null) {
+            source.sendFailure(Component.literal(
+                    String.format("No agent named '%s' found.", name)));
+            return 0;
+        }
+        agent.remove(Entity.RemovalReason.DISCARDED);
+        source.sendSuccess(() -> Component.translatable("mineavatar.message.agent_dismissed", 1), true);
+        return 1;
+    }
+
+    private static int dismissAllAgents(CommandSourceStack source, ServerPlayer player) {
         ServerLevel level = player.serverLevel();
         int dismissed = 0;
 
@@ -98,10 +138,11 @@ public class MineAvatarCommands {
         return dismissed;
     }
 
-    private static int moveToCommand(CommandSourceStack source, ServerPlayer player, Vec3 pos) {
-        AgentEntity agent = findOwnedAgent(player);
+    private static int moveToCommand(CommandSourceStack source, ServerPlayer player, String name, Vec3 pos) {
+        AgentEntity agent = findOwnedAgent(player, name);
         if (agent == null) {
-            source.sendFailure(Component.literal("No agent found. Use /mineavatar spawn <name> first."));
+            source.sendFailure(Component.literal(
+                    String.format("No agent named '%s' found.", name)));
             return 0;
         }
 
@@ -118,10 +159,11 @@ public class MineAvatarCommands {
         return success ? 1 : 0;
     }
 
-    private static int lookAtCommand(CommandSourceStack source, ServerPlayer player, Entity target) {
-        AgentEntity agent = findOwnedAgent(player);
+    private static int lookAtCommand(CommandSourceStack source, ServerPlayer player, String name, Entity target) {
+        AgentEntity agent = findOwnedAgent(player, name);
         if (agent == null) {
-            source.sendFailure(Component.literal("No agent found. Use /mineavatar spawn <name> first."));
+            source.sendFailure(Component.literal(
+                    String.format("No agent named '%s' found.", name)));
             return 0;
         }
 
@@ -132,10 +174,11 @@ public class MineAvatarCommands {
         return 1;
     }
 
-    private static int lookAtClear(CommandSourceStack source, ServerPlayer player) {
-        AgentEntity agent = findOwnedAgent(player);
+    private static int lookAtClear(CommandSourceStack source, ServerPlayer player, String name) {
+        AgentEntity agent = findOwnedAgent(player, name);
         if (agent == null) {
-            source.sendFailure(Component.literal("No agent found. Use /mineavatar spawn <name> first."));
+            source.sendFailure(Component.literal(
+                    String.format("No agent named '%s' found.", name)));
             return 0;
         }
 
@@ -145,35 +188,73 @@ public class MineAvatarCommands {
         return 1;
     }
 
-    private static int attackCommand(CommandSourceStack source, ServerPlayer player, Entity target) {
-        AgentEntity agent = findOwnedAgent(player);
+    private static int attackCommand(CommandSourceStack source, ServerPlayer player, String name, Entity target) {
+        AgentEntity agent = findOwnedAgent(player, name);
         if (agent == null) {
-            source.sendFailure(Component.literal("No agent found. Use /mineavatar spawn <name> first."));
+            source.sendFailure(Component.literal(
+                    String.format("No agent named '%s' found.", name)));
             return 0;
         }
 
-        boolean success = agent.commandAttack(target);
-        if (success) {
-            source.sendSuccess(() -> Component.literal(
-                    String.format("Agent '%s' attacked %s",
-                            agent.getAgentName(), target.getName().getString())), false);
-        } else {
-            source.sendFailure(Component.literal(
-                    String.format("Agent '%s' failed to attack %s",
-                            agent.getAgentName(), target.getName().getString())));
+        AgentEntity.AttackResult result = agent.commandAttack(target);
+        switch (result) {
+            case SUCCESS -> source.sendSuccess(() -> Component.literal(
+                    String.format("Agent '%s' attacked %s", name, target.getName().getString())), false);
+            case TARGET_DEAD -> source.sendFailure(Component.literal(
+                    String.format("Agent '%s': target is dead or invalid.", name)));
+            case OUT_OF_RANGE -> source.sendFailure(Component.literal(
+                    String.format("Agent '%s': target '%s' out of range (%.1f blocks away, reach %.1f).",
+                            name, target.getName().getString(),
+                            agent.distanceTo(target),
+                            agent.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.ENTITY_INTERACTION_RANGE))));
+            case TARGET_INVULNERABLE -> source.sendFailure(Component.literal(
+                    String.format("Agent '%s': target '%s' is invulnerable (creative/spectator mode).",
+                            name, target.getName().getString())));
+            case PEACEFUL -> source.sendFailure(Component.literal(
+                    String.format("Agent '%s': cannot hurt players in peaceful difficulty. Use /difficulty easy",
+                            name)));
+            case MISSED -> source.sendFailure(Component.literal(
+                    String.format("Agent '%s': attack on '%s' did not land.",
+                            name, target.getName().getString())));
         }
-        return success ? 1 : 0;
+        return result == AgentEntity.AttackResult.SUCCESS ? 1 : 0;
     }
 
-    /**
-     * Find the first agent entity owned by the given player in the same level.
-     */
+    private static int modelSet(CommandSourceStack source, ServerPlayer player, String name, String modelFolder) {
+        AgentEntity agent = findOwnedAgent(player, name);
+        if (agent == null) {
+            source.sendFailure(Component.literal(
+                    String.format("No agent named '%s' found.", name)));
+            return 0;
+        }
+
+        agent.setMmdModel(modelFolder);
+        source.sendSuccess(() -> Component.translatable(
+                "mineavatar.message.model_set", name, modelFolder), false);
+        return 1;
+    }
+
+    private static int modelClear(CommandSourceStack source, ServerPlayer player, String name) {
+        AgentEntity agent = findOwnedAgent(player, name);
+        if (agent == null) {
+            source.sendFailure(Component.literal(
+                    String.format("No agent named '%s' found.", name)));
+            return 0;
+        }
+
+        agent.setMmdModel("");
+        source.sendSuccess(() -> Component.translatable(
+                "mineavatar.message.model_cleared", name), false);
+        return 1;
+    }
+
     @javax.annotation.Nullable
-    private static AgentEntity findOwnedAgent(ServerPlayer player) {
+    private static AgentEntity findOwnedAgent(ServerPlayer player, String name) {
         ServerLevel level = player.serverLevel();
         for (Entity entity : level.getAllEntities()) {
             if (entity instanceof AgentEntity agent
-                    && player.getUUID().equals(agent.getOwnerUUID())) {
+                    && player.getUUID().equals(agent.getOwnerUUID())
+                    && agent.getAgentName().equals(name)) {
                 return agent;
             }
         }

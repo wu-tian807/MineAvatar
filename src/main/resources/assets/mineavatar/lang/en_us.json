@@ -10,5 +10,7 @@
   "mineavatar.configuration.agent.maxPerPlayer": "Max Agents Per Player",
 
   "mineavatar.message.agent_spawned": "Agent '%s' has been spawned!",
-  "mineavatar.message.agent_dismissed": "Dismissed %d agent(s)."
+  "mineavatar.message.agent_dismissed": "Dismissed %d agent(s).",
+  "mineavatar.message.model_set": "Agent '%s' model set to '%s'.",
+  "mineavatar.message.model_cleared": "Agent '%s' model cleared (back to Steve)."
 }

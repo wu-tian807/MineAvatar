@@ -81,9 +81,11 @@ configurations {
 }
 
 dependencies {
-    // MmdSkin - optional dependency for custom MMD avatar rendering
+    // MmdSkin (NeoForge) - optional dependency for custom MMD avatar rendering
     // https://modrinth.com/mod/mmdskin
-    compileOnly "maven.modrinth:mmdskin:1.0.3-1.21.1"
+    // Using version ID (hPocqts0) to pull the NeoForge build specifically,
+    // since version number "1.0.3-1.21.1" is shared with the Fabric build.
+    compileOnly "maven.modrinth:mmdskin:hPocqts0"
 }
 
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {

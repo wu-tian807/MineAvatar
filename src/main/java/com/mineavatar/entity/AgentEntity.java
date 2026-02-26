@@ -31,9 +31,8 @@ import java.util.UUID;
  * Inherits PathfinderMob for built-in GroundPathNavigation and LookControl.
  * No AI goals registered; the agent only acts on external commands (moveTo, lookAt).
  *
- * TODO: Future MmdSkin compatibility — when MmdSkin mod is present, the agent's
- *  renderer should be swapped to use a custom PMX model via MmdSkin's API.
- *  The entity dimensions (0.6 x 1.8) match a standard player for this purpose.
+ * When MmdSkin mod is present and a model is assigned via {@link #setMmdModel(String)},
+ * the renderer will use the specified PMX model instead of the default Steve skin.
  */
 public class AgentEntity extends PathfinderMob {
 
@@ -41,6 +40,8 @@ public class AgentEntity extends PathfinderMob {
             SynchedEntityData.defineId(AgentEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Optional<UUID>> OWNER_UUID =
             SynchedEntityData.defineId(AgentEntity.class, EntityDataSerializers.OPTIONAL_UUID);
+    private static final EntityDataAccessor<String> MMD_MODEL =
+            SynchedEntityData.defineId(AgentEntity.class, EntityDataSerializers.STRING);
 
     @Nullable
     private Entity lookTarget;
@@ -75,6 +76,7 @@ public class AgentEntity extends PathfinderMob {
         super.defineSynchedData(builder);
         builder.define(AGENT_NAME, "Agent");
         builder.define(OWNER_UUID, Optional.empty());
+        builder.define(MMD_MODEL, "");
     }
 
     @Override
@@ -110,26 +112,45 @@ public class AgentEntity extends PathfinderMob {
         }
     }
 
+    public enum AttackResult {
+        SUCCESS, TARGET_DEAD, OUT_OF_RANGE, TARGET_INVULNERABLE, PEACEFUL, MISSED
+    }
+
     /**
      * Attack a target entity using the agent's ATTACK_DAMAGE attribute.
-     * Uses Mob's native {@code isWithinMeleeAttackRange()} for range checking.
-     * @return true if the attack landed successfully
+     * Range is governed by the ENTITY_INTERACTION_RANGE attribute (default 3.0 blocks).
      */
-    public boolean commandAttack(Entity target) {
-        if (target instanceof LivingEntity livingTarget && livingTarget.isAlive()) {
-            this.getLookControl().setLookAt(target, 30.0F, 30.0F);
-            if (!this.isWithinMeleeAttackRange(livingTarget)) {
-                MineAvatar.LOGGER.debug("Agent '{}' target {} out of melee range", getAgentName(), target.getName().getString());
-                return false;
-            }
-            this.swing(InteractionHand.MAIN_HAND);
-            boolean hit = this.doHurtTarget(target);
-            if (hit) {
-                MineAvatar.LOGGER.debug("Agent '{}' attacked {}", getAgentName(), target.getName().getString());
-            }
-            return hit;
+    public AttackResult commandAttack(Entity target) {
+        if (!(target instanceof LivingEntity livingTarget) || !livingTarget.isAlive()) {
+            return AttackResult.TARGET_DEAD;
         }
-        return false;
+
+        this.getLookControl().setLookAt(target, 30.0F, 30.0F);
+
+        double reach = this.getAttributeValue(Attributes.ENTITY_INTERACTION_RANGE);
+        double dist = this.distanceTo(livingTarget);
+        if (dist > reach) {
+            return AttackResult.OUT_OF_RANGE;
+        }
+
+        if (livingTarget instanceof Player p && (p.isCreative() || p.isSpectator())) {
+            return AttackResult.TARGET_INVULNERABLE;
+        }
+
+        if (this.level().getDifficulty() == net.minecraft.world.Difficulty.PEACEFUL
+                && livingTarget instanceof Player) {
+            return AttackResult.PEACEFUL;
+        }
+
+        this.swing(InteractionHand.MAIN_HAND);
+        boolean hit = this.doHurtTarget(target);
+        return hit ? AttackResult.SUCCESS : AttackResult.MISSED;
+    }
+
+    @Override
+    public void aiStep() {
+        super.aiStep();
+        this.updateSwingTime();
     }
 
     @Override
@@ -166,8 +187,10 @@ public class AgentEntity extends PathfinderMob {
         if (!level().isClientSide && player.getUUID().equals(getOwnerUUID())) {
             String status = getNavigation().isInProgress() ? "navigating" : "idle";
             String lookInfo = lookTarget != null ? lookTarget.getName().getString() : "nothing";
+            String modelInfo = getMmdModel().isEmpty() ? "Steve" : getMmdModel();
             player.sendSystemMessage(Component.literal(
-                    String.format("[%s] Status: %s | Looking at: %s", getAgentName(), status, lookInfo)));
+                    String.format("[%s] Status: %s | Looking at: %s | Model: %s",
+                            getAgentName(), status, lookInfo, modelInfo)));
             return InteractionResult.SUCCESS;
         }
         return super.mobInteract(player, hand);
@@ -214,6 +237,10 @@ public class AgentEntity extends PathfinderMob {
         if (getOwnerUUID() != null) {
             tag.putUUID("OwnerUUID", getOwnerUUID());
         }
+        String mmdModel = getMmdModel();
+        if (!mmdModel.isEmpty()) {
+            tag.putString("MmdModel", mmdModel);
+        }
     }
 
     @Override
@@ -226,6 +253,9 @@ public class AgentEntity extends PathfinderMob {
         if (tag.hasUUID("OwnerUUID")) {
             setOwnerUUID(tag.getUUID("OwnerUUID"));
         }
+        if (tag.contains("MmdModel")) {
+            setMmdModel(tag.getString("MmdModel"));
+        }
     }
 
     // ========== Accessors ==========
@@ -236,6 +266,9 @@ public class AgentEntity extends PathfinderMob {
     @Nullable
     public UUID getOwnerUUID() { return entityData.get(OWNER_UUID).orElse(null); }
     public void setOwnerUUID(@Nullable UUID uuid) { entityData.set(OWNER_UUID, Optional.ofNullable(uuid)); }
+
+    public String getMmdModel() { return entityData.get(MMD_MODEL); }
+    public void setMmdModel(String model) { entityData.set(MMD_MODEL, model != null ? model : ""); }
 
     @Nullable
     public Player getOwner() {
