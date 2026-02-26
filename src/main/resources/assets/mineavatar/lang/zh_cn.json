@@ -1,0 +1,14 @@
+{
+  "itemGroup.mineavatar": "MineAvatar",
+  "item.mineavatar.agent_spawner": "Agent 生成器",
+  "entity.mineavatar.agent": "Agent",
+
+  "mineavatar.configuration.title": "MineAvatar 设置",
+  "mineavatar.configuration.section.mineavatar.common.toml": "MineAvatar 设置",
+  "mineavatar.configuration.section.mineavatar.common.toml.title": "MineAvatar 设置",
+  "mineavatar.configuration.agent.moveSpeed": "Agent 移动速度",
+  "mineavatar.configuration.agent.maxPerPlayer": "每个玩家最大 Agent 数",
+
+  "mineavatar.message.agent_spawned": "Agent '%s' 已生成！",
+  "mineavatar.message.agent_dismissed": "已遣散 %d 个 Agent。"
+}

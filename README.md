@@ -1,25 +1,53 @@
+# MineAvatar
 
-Installation information
-=======
+**Universal Minecraft Companion Platform**
 
-This template repository can be directly cloned to get you started with a new
-mod. Simply create a new repository cloned from this one, by following the
-instructions provided by [GitHub](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template).
+Minecraft 1.21.1 NeoForge Mod — AI Agent 实体平台。
 
-Once you have your clone, simply open the repository in the IDE of your choice. The usual recommendation for an IDE is either IntelliJ IDEA or Eclipse.
+## 当前功能
 
-If at any point you are missing libraries in your IDE, or you've run into problems you can
-run `gradlew --refresh-dependencies` to refresh the local cache. `gradlew clean` to reset everything 
-{this does not affect your code} and then start the process again.
+- **Agent 实体** — 基于 `PathfinderMob` 的人形实体，通过命令驱动行为
+- **MoveTo** — 使用 Mojang 内置的 `PathNavigation` 导航到指定坐标
+- **LookAt** — 持续注视指定实体
+- **MmdSkin 可选依赖** — 预留了与 [MmdSkin](https://modrinth.com/mod/mmdskin) 的集成接口，未来支持自定义 MMD 形象
 
-Mapping Names:
-============
-By default, the MDK is configured to use the official mapping names from Mojang for methods and fields 
-in the Minecraft codebase. These names are covered by a specific license. All modders should be aware of this
-license. For the latest license text, refer to the mapping file itself, or the reference copy here:
-https://github.com/NeoForged/NeoForm/blob/main/Mojang.md
+## 技术栈
 
-Additional Resources: 
-==========
-Community Documentation: https://docs.neoforged.net/  
-NeoForged Discord: https://discord.neoforged.net/
+| 组件 | 版本 |
+|------|------|
+| Minecraft | 1.21.1 |
+| NeoForge | 21.1.217 |
+| Java | 21 |
+
+## 命令
+
+```
+/mineavatar spawn <name>        — 在玩家身边生成 Agent
+/mineavatar dismiss             — 遣散所有自己的 Agent
+/mineavatar moveto <x> <y> <z>  — 让 Agent 导航到坐标
+/mineavatar lookat <entity>     — 让 Agent 注视目标实体
+```
+
+## 构建
+
+```bash
+./gradlew build
+```
+
+## 运行
+
+```bash
+./gradlew runClient   # 启动客户端
+./gradlew runServer   # 启动服务端
+```
+
+## 路线图
+
+- [ ] OpenClaw 智能体框架集成
+- [ ] MmdSkin 自定义形象渲染
+- [ ] 更多 Agent 动作（攻击、采集、跟随等）
+- [ ] 多 Agent 管理与选择
+
+## 许可证
+
+MIT License

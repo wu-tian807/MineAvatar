@@ -1,0 +1,14 @@
+{
+  "itemGroup.mineavatar": "MineAvatar",
+  "item.mineavatar.agent_spawner": "Agent Spawner",
+  "entity.mineavatar.agent": "Agent",
+
+  "mineavatar.configuration.title": "MineAvatar Settings",
+  "mineavatar.configuration.section.mineavatar.common.toml": "MineAvatar Settings",
+  "mineavatar.configuration.section.mineavatar.common.toml.title": "MineAvatar Settings",
+  "mineavatar.configuration.agent.moveSpeed": "Agent Move Speed",
+  "mineavatar.configuration.agent.maxPerPlayer": "Max Agents Per Player",
+
+  "mineavatar.message.agent_spawned": "Agent '%s' has been spawned!",
+  "mineavatar.message.agent_dismissed": "Dismissed %d agent(s)."
+}
