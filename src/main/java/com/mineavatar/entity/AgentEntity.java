@@ -21,6 +21,8 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 
+import net.minecraft.core.BlockPos;
+
 import javax.annotation.Nullable;
 import java.util.Optional;
 import java.util.UUID;
@@ -46,6 +48,9 @@ public class AgentEntity extends PathfinderMob {
     @Nullable
     private Entity lookTarget;
 
+    @Nullable
+    private BlockPos lookBlockTarget;
+
     public AgentEntity(EntityType<? extends AgentEntity> entityType, Level level) {
         super(entityType, level);
         this.setCustomNameVisible(true);
@@ -58,7 +63,7 @@ public class AgentEntity extends PathfinderMob {
     public static AttributeSupplier.Builder createAttributes() {
         return PathfinderMob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH, 20.0)
-                .add(Attributes.MOVEMENT_SPEED, 0.1F)
+                .add(Attributes.MOVEMENT_SPEED, 0.3F)
                 .add(Attributes.FOLLOW_RANGE, 48.0)
                 .add(Attributes.ATTACK_DAMAGE, 1.0)
                 .add(Attributes.ATTACK_SPEED, 4.0)
@@ -91,8 +96,7 @@ public class AgentEntity extends PathfinderMob {
      * @return true if a path was successfully started
      */
     public boolean commandMoveTo(double x, double y, double z) {
-        double speed = this.getAttributeValue(Attributes.MOVEMENT_SPEED) * 2.5;
-        boolean started = this.getNavigation().moveTo(x, y, z, speed);
+        boolean started = this.getNavigation().moveTo(x, y, z, 1.0);
         if (started) {
             MineAvatar.LOGGER.debug("Agent '{}' moving to ({}, {}, {})", getAgentName(), x, y, z);
         } else {
@@ -108,8 +112,26 @@ public class AgentEntity extends PathfinderMob {
     public void commandLookAt(@Nullable Entity target) {
         this.lookTarget = target;
         if (target != null) {
+            this.lookBlockTarget = null;
             MineAvatar.LOGGER.debug("Agent '{}' looking at {}", getAgentName(), target.getName().getString());
         }
+    }
+
+    /**
+     * Set the agent to continuously face a block position.
+     * Pass null to clear the block look target.
+     */
+    public void commandLookAtBlock(@Nullable BlockPos target) {
+        this.lookBlockTarget = target;
+        if (target != null) {
+            this.lookTarget = null;
+            MineAvatar.LOGGER.debug("Agent '{}' looking at block ({}, {}, {})",
+                    getAgentName(), target.getX(), target.getY(), target.getZ());
+        }
+    }
+
+    public void commandLookAtBlock(int x, int y, int z) {
+        commandLookAtBlock(new BlockPos(x, y, z));
     }
 
     public enum AttackResult {
@@ -163,6 +185,11 @@ public class AgentEntity extends PathfinderMob {
             } else {
                 lookTarget = null;
             }
+        } else if (lookBlockTarget != null) {
+            this.getLookControl().setLookAt(
+                    lookBlockTarget.getX() + 0.5,
+                    lookBlockTarget.getY() + 0.5,
+                    lookBlockTarget.getZ() + 0.5);
         }
 
         if (!level().isClientSide && this.isAlive() && this.tickCount % REGEN_INTERVAL_TICKS == 0) {
