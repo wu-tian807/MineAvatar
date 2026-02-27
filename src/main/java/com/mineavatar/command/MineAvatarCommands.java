@@ -1,7 +1,9 @@
 package com.mineavatar.command;
 
-import com.mineavatar.MineAvatar;
-import com.mineavatar.entity.AgentEntity;
+import com.google.gson.JsonObject;
+import com.mineavatar.action.ActionContext;
+import com.mineavatar.action.ActionRegistry;
+import com.mineavatar.action.ActionResult;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 
@@ -10,254 +12,158 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.commands.arguments.coordinates.Vec3Argument;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
 
+/**
+ * Game commands that route through ActionRegistry.
+ * Same action handlers as WebSocket — guaranteed consistent behavior.
+ */
 public class MineAvatarCommands {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("mineavatar")
                 .then(Commands.literal("spawn")
                         .then(Commands.argument("name", StringArgumentType.string())
+                                .then(Commands.argument("pos", Vec3Argument.vec3())
+                                        .executes(ctx -> {
+                                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                            Vec3 pos = Vec3Argument.getVec3(ctx, "pos");
+                                            JsonObject params = new JsonObject();
+                                            params.addProperty("name", StringArgumentType.getString(ctx, "name"));
+                                            params.addProperty("x", pos.x);
+                                            params.addProperty("y", pos.y);
+                                            params.addProperty("z", pos.z);
+                                            return dispatch(ctx.getSource(), player, "agent.spawn", params);
+                                        }))
                                 .executes(ctx -> {
                                     ServerPlayer player = ctx.getSource().getPlayerOrException();
-                                    String name = StringArgumentType.getString(ctx, "name");
-                                    return spawnAgent(ctx.getSource(), player, name);
+                                    JsonObject params = new JsonObject();
+                                    params.addProperty("name", StringArgumentType.getString(ctx, "name"));
+                                    params.addProperty("x", player.getX() + 2);
+                                    params.addProperty("y", player.getY());
+                                    params.addProperty("z", player.getZ());
+                                    return dispatch(ctx.getSource(), player, "agent.spawn", params);
                                 })))
                 .then(Commands.literal("dismiss")
                         .then(Commands.argument("name", StringArgumentType.string())
                                 .executes(ctx -> {
                                     ServerPlayer player = ctx.getSource().getPlayerOrException();
-                                    String name = StringArgumentType.getString(ctx, "name");
-                                    return dismissAgent(ctx.getSource(), player, name);
+                                    JsonObject params = new JsonObject();
+                                    params.addProperty("agent", StringArgumentType.getString(ctx, "name"));
+                                    return dispatch(ctx.getSource(), player, "agent.dismiss", params);
                                 }))
                         .executes(ctx -> {
                             ServerPlayer player = ctx.getSource().getPlayerOrException();
-                            return dismissAllAgents(ctx.getSource(), player);
+                            return dispatch(ctx.getSource(), player, "agent.dismiss", new JsonObject());
                         }))
                 .then(Commands.literal("moveto")
                         .then(Commands.argument("name", StringArgumentType.string())
                                 .then(Commands.argument("pos", Vec3Argument.vec3())
                                         .executes(ctx -> {
                                             ServerPlayer player = ctx.getSource().getPlayerOrException();
-                                            String name = StringArgumentType.getString(ctx, "name");
                                             Vec3 pos = Vec3Argument.getVec3(ctx, "pos");
-                                            return moveToCommand(ctx.getSource(), player, name, pos);
+                                            JsonObject params = new JsonObject();
+                                            params.addProperty("agent", StringArgumentType.getString(ctx, "name"));
+                                            params.addProperty("x", pos.x);
+                                            params.addProperty("y", pos.y);
+                                            params.addProperty("z", pos.z);
+                                            return dispatch(ctx.getSource(), player, "agent.moveTo", params);
                                         }))))
+                .then(Commands.literal("stop")
+                        .then(Commands.argument("name", StringArgumentType.string())
+                                .executes(ctx -> {
+                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    JsonObject params = new JsonObject();
+                                    params.addProperty("agent", StringArgumentType.getString(ctx, "name"));
+                                    return dispatch(ctx.getSource(), player, "agent.stop", params);
+                                })))
                 .then(Commands.literal("lookat")
                         .then(Commands.argument("name", StringArgumentType.string())
                                 .then(Commands.literal("clear")
                                         .executes(ctx -> {
                                             ServerPlayer player = ctx.getSource().getPlayerOrException();
-                                            String name = StringArgumentType.getString(ctx, "name");
-                                            return lookAtClear(ctx.getSource(), player, name);
+                                            JsonObject params = new JsonObject();
+                                            params.addProperty("agent", StringArgumentType.getString(ctx, "name"));
+                                            return dispatch(ctx.getSource(), player, "agent.lookClear", params);
                                         }))
                                 .then(Commands.argument("target", EntityArgument.entity())
                                         .executes(ctx -> {
                                             ServerPlayer player = ctx.getSource().getPlayerOrException();
-                                            String name = StringArgumentType.getString(ctx, "name");
                                             Entity target = EntityArgument.getEntity(ctx, "target");
-                                            return lookAtCommand(ctx.getSource(), player, name, target);
+                                            JsonObject params = new JsonObject();
+                                            params.addProperty("agent", StringArgumentType.getString(ctx, "name"));
+                                            params.addProperty("target", target.getStringUUID());
+                                            return dispatch(ctx.getSource(), player, "agent.lookAt", params);
                                         }))))
                 .then(Commands.literal("attack")
                         .then(Commands.argument("name", StringArgumentType.string())
                                 .then(Commands.argument("target", EntityArgument.entity())
                                         .executes(ctx -> {
                                             ServerPlayer player = ctx.getSource().getPlayerOrException();
-                                            String name = StringArgumentType.getString(ctx, "name");
                                             Entity target = EntityArgument.getEntity(ctx, "target");
-                                            return attackCommand(ctx.getSource(), player, name, target);
+                                            JsonObject params = new JsonObject();
+                                            params.addProperty("agent", StringArgumentType.getString(ctx, "name"));
+                                            params.addProperty("target", target.getStringUUID());
+                                            return dispatch(ctx.getSource(), player, "agent.attack", params);
+                                        }))))
+                .then(Commands.literal("chat")
+                        .then(Commands.argument("name", StringArgumentType.string())
+                                .then(Commands.argument("message", StringArgumentType.greedyString())
+                                        .executes(ctx -> {
+                                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                            JsonObject params = new JsonObject();
+                                            params.addProperty("agent", StringArgumentType.getString(ctx, "name"));
+                                            params.addProperty("message", StringArgumentType.getString(ctx, "message"));
+                                            return dispatch(ctx.getSource(), player, "agent.chat", params);
                                         }))))
                 .then(Commands.literal("model")
                         .then(Commands.argument("name", StringArgumentType.string())
                                 .then(Commands.literal("clear")
                                         .executes(ctx -> {
                                             ServerPlayer player = ctx.getSource().getPlayerOrException();
-                                            String name = StringArgumentType.getString(ctx, "name");
-                                            return modelClear(ctx.getSource(), player, name);
+                                            JsonObject params = new JsonObject();
+                                            params.addProperty("agent", StringArgumentType.getString(ctx, "name"));
+                                            params.addProperty("modelFolder", "");
+                                            return dispatch(ctx.getSource(), player, "agent.setModel", params);
                                         }))
                                 .then(Commands.argument("modelFolder", StringArgumentType.string())
                                         .executes(ctx -> {
                                             ServerPlayer player = ctx.getSource().getPlayerOrException();
-                                            String name = StringArgumentType.getString(ctx, "name");
-                                            String modelFolder = StringArgumentType.getString(ctx, "modelFolder");
-                                            return modelSet(ctx.getSource(), player, name, modelFolder);
+                                            JsonObject params = new JsonObject();
+                                            params.addProperty("agent", StringArgumentType.getString(ctx, "name"));
+                                            params.addProperty("modelFolder", StringArgumentType.getString(ctx, "modelFolder"));
+                                            return dispatch(ctx.getSource(), player, "agent.setModel", params);
                                         }))))
+                .then(Commands.literal("status")
+                        .then(Commands.argument("name", StringArgumentType.string())
+                                .executes(ctx -> {
+                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                    JsonObject params = new JsonObject();
+                                    params.addProperty("agent", StringArgumentType.getString(ctx, "name"));
+                                    return dispatch(ctx.getSource(), player, "perception.self", params);
+                                })))
+                .then(Commands.literal("list")
+                        .executes(ctx -> {
+                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                            return dispatch(ctx.getSource(), player, "perception.agents", new JsonObject());
+                        }))
         );
     }
 
-    private static int spawnAgent(CommandSourceStack source, ServerPlayer player, String name) {
-        ServerLevel level = player.serverLevel();
+    /**
+     * Dispatch through ActionRegistry.
+     * Silent on success; only shows errors to prevent silent failures during testing.
+     * In production, results go to the agent via TCP, not to the player's chat.
+     */
+    private static int dispatch(CommandSourceStack source, ServerPlayer player, String method, JsonObject params) {
+        ActionContext ctx = new ActionContext(source.getServer());
+        ActionResult result = ActionRegistry.get().dispatch(method, ctx, params);
 
-        AgentEntity agent = MineAvatar.AGENT_ENTITY.get().create(level);
-        if (agent == null) {
-            source.sendFailure(Component.literal("Failed to create agent entity."));
-            return 0;
+        if (!result.isSuccess()) {
+            source.sendFailure(Component.literal("[MineAvatar] " + result.toReadable()));
         }
-
-        agent.moveTo(player.getX() + 2, player.getY(), player.getZ(), player.getYRot(), 0);
-        agent.initAgent(name, player);
-        level.addFreshEntity(agent);
-
-        source.sendSuccess(() -> Component.translatable("mineavatar.message.agent_spawned", name), true);
-        return 1;
-    }
-
-    private static int dismissAgent(CommandSourceStack source, ServerPlayer player, String name) {
-        AgentEntity agent = findOwnedAgent(player, name);
-        if (agent == null) {
-            source.sendFailure(Component.literal(
-                    String.format("No agent named '%s' found.", name)));
-            return 0;
-        }
-        agent.remove(Entity.RemovalReason.DISCARDED);
-        source.sendSuccess(() -> Component.translatable("mineavatar.message.agent_dismissed", 1), true);
-        return 1;
-    }
-
-    private static int dismissAllAgents(CommandSourceStack source, ServerPlayer player) {
-        ServerLevel level = player.serverLevel();
-        int dismissed = 0;
-
-        for (Entity entity : level.getAllEntities()) {
-            if (entity instanceof AgentEntity agent
-                    && player.getUUID().equals(agent.getOwnerUUID())) {
-                agent.remove(Entity.RemovalReason.DISCARDED);
-                dismissed++;
-            }
-        }
-
-        if (dismissed > 0) {
-            int count = dismissed;
-            source.sendSuccess(() -> Component.translatable("mineavatar.message.agent_dismissed", count), true);
-        } else {
-            source.sendFailure(Component.literal("No agents found."));
-        }
-        return dismissed;
-    }
-
-    private static int moveToCommand(CommandSourceStack source, ServerPlayer player, String name, Vec3 pos) {
-        AgentEntity agent = findOwnedAgent(player, name);
-        if (agent == null) {
-            source.sendFailure(Component.literal(
-                    String.format("No agent named '%s' found.", name)));
-            return 0;
-        }
-
-        boolean success = agent.commandMoveTo(pos.x, pos.y, pos.z);
-        if (success) {
-            source.sendSuccess(() -> Component.literal(
-                    String.format("Agent '%s' moving to (%.1f, %.1f, %.1f)",
-                            agent.getAgentName(), pos.x, pos.y, pos.z)), false);
-        } else {
-            source.sendFailure(Component.literal(
-                    String.format("Agent '%s' cannot find path to (%.1f, %.1f, %.1f)",
-                            agent.getAgentName(), pos.x, pos.y, pos.z)));
-        }
-        return success ? 1 : 0;
-    }
-
-    private static int lookAtCommand(CommandSourceStack source, ServerPlayer player, String name, Entity target) {
-        AgentEntity agent = findOwnedAgent(player, name);
-        if (agent == null) {
-            source.sendFailure(Component.literal(
-                    String.format("No agent named '%s' found.", name)));
-            return 0;
-        }
-
-        agent.commandLookAt(target);
-        source.sendSuccess(() -> Component.literal(
-                String.format("Agent '%s' now looking at %s",
-                        agent.getAgentName(), target.getName().getString())), false);
-        return 1;
-    }
-
-    private static int lookAtClear(CommandSourceStack source, ServerPlayer player, String name) {
-        AgentEntity agent = findOwnedAgent(player, name);
-        if (agent == null) {
-            source.sendFailure(Component.literal(
-                    String.format("No agent named '%s' found.", name)));
-            return 0;
-        }
-
-        agent.commandLookAt(null);
-        source.sendSuccess(() -> Component.literal(
-                String.format("Agent '%s' stopped looking at target.", agent.getAgentName())), false);
-        return 1;
-    }
-
-    private static int attackCommand(CommandSourceStack source, ServerPlayer player, String name, Entity target) {
-        AgentEntity agent = findOwnedAgent(player, name);
-        if (agent == null) {
-            source.sendFailure(Component.literal(
-                    String.format("No agent named '%s' found.", name)));
-            return 0;
-        }
-
-        AgentEntity.AttackResult result = agent.commandAttack(target);
-        switch (result) {
-            case SUCCESS -> source.sendSuccess(() -> Component.literal(
-                    String.format("Agent '%s' attacked %s", name, target.getName().getString())), false);
-            case TARGET_DEAD -> source.sendFailure(Component.literal(
-                    String.format("Agent '%s': target is dead or invalid.", name)));
-            case OUT_OF_RANGE -> source.sendFailure(Component.literal(
-                    String.format("Agent '%s': target '%s' out of range (%.1f blocks away, reach %.1f).",
-                            name, target.getName().getString(),
-                            agent.distanceTo(target),
-                            agent.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.ENTITY_INTERACTION_RANGE))));
-            case TARGET_INVULNERABLE -> source.sendFailure(Component.literal(
-                    String.format("Agent '%s': target '%s' is invulnerable (creative/spectator mode).",
-                            name, target.getName().getString())));
-            case PEACEFUL -> source.sendFailure(Component.literal(
-                    String.format("Agent '%s': cannot hurt players in peaceful difficulty. Use /difficulty easy",
-                            name)));
-            case MISSED -> source.sendFailure(Component.literal(
-                    String.format("Agent '%s': attack on '%s' did not land.",
-                            name, target.getName().getString())));
-        }
-        return result == AgentEntity.AttackResult.SUCCESS ? 1 : 0;
-    }
-
-    private static int modelSet(CommandSourceStack source, ServerPlayer player, String name, String modelFolder) {
-        AgentEntity agent = findOwnedAgent(player, name);
-        if (agent == null) {
-            source.sendFailure(Component.literal(
-                    String.format("No agent named '%s' found.", name)));
-            return 0;
-        }
-
-        agent.setMmdModel(modelFolder);
-        source.sendSuccess(() -> Component.translatable(
-                "mineavatar.message.model_set", name, modelFolder), false);
-        return 1;
-    }
-
-    private static int modelClear(CommandSourceStack source, ServerPlayer player, String name) {
-        AgentEntity agent = findOwnedAgent(player, name);
-        if (agent == null) {
-            source.sendFailure(Component.literal(
-                    String.format("No agent named '%s' found.", name)));
-            return 0;
-        }
-
-        agent.setMmdModel("");
-        source.sendSuccess(() -> Component.translatable(
-                "mineavatar.message.model_cleared", name), false);
-        return 1;
-    }
-
-    @javax.annotation.Nullable
-    private static AgentEntity findOwnedAgent(ServerPlayer player, String name) {
-        ServerLevel level = player.serverLevel();
-        for (Entity entity : level.getAllEntities()) {
-            if (entity instanceof AgentEntity agent
-                    && player.getUUID().equals(agent.getOwnerUUID())
-                    && agent.getAgentName().equals(name)) {
-                return agent;
-            }
-        }
-        return null;
+        return result.isSuccess() ? 1 : 0;
     }
 }

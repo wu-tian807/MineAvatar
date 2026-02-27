@@ -1,7 +1,9 @@
 package com.mineavatar;
 
+import com.mineavatar.action.ActionRegistry;
 import com.mineavatar.command.MineAvatarCommands;
 import com.mineavatar.entity.AgentEntity;
+import com.mineavatar.network.AgentTcpServer;
 import org.slf4j.Logger;
 
 import com.mojang.logging.LogUtils;
@@ -22,9 +24,13 @@ import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
+import net.neoforged.neoforge.event.server.ServerStartedEvent;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
+
+import javax.annotation.Nullable;
 
 @Mod(MineAvatar.MODID)
 public class MineAvatar {
@@ -57,6 +63,9 @@ public class MineAvatar {
                         output.accept(AGENT_SPAWNER.get());
                     }).build());
 
+    @Nullable
+    private AgentTcpServer tcpServer;
+
     public MineAvatar(IEventBus modEventBus, ModContainer modContainer) {
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::registerEntityAttributes);
@@ -83,5 +92,22 @@ public class MineAvatar {
     @SubscribeEvent
     public void onRegisterCommands(RegisterCommandsEvent event) {
         MineAvatarCommands.register(event.getDispatcher());
+    }
+
+    @SubscribeEvent
+    public void onServerStarted(ServerStartedEvent event) {
+        if (MineAvatarConfig.WS_ENABLED.get()) {
+            int port = MineAvatarConfig.WS_PORT.get();
+            tcpServer = new AgentTcpServer(port);
+            tcpServer.start(event.getServer(), ActionRegistry.get());
+        }
+    }
+
+    @SubscribeEvent
+    public void onServerStopped(ServerStoppedEvent event) {
+        if (tcpServer != null) {
+            tcpServer.stop();
+            tcpServer = null;
+        }
     }
 }
